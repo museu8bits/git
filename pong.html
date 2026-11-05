@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>PONG 1972</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font-family:"Courier New",monospace;display:flex;align-items:center;justify-content:center}
+  canvas{background:#000;border:4px solid #fff;max-width:100%}
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="600"></canvas>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const W = 800, H = 600, PW = 12, PH = 80, BS = 12, WIN = 7, KEY = 'pong70-highscores';
+let state = 'splash', keys = {}, p1, p2, ball, s1, s2, name = '', winner = '';
+
+const load = () => { try { return JSON.parse(localStorage[KEY]) || []; } catch { return []; } };
+const save = e => { const l = load(); l.push(e); l.sort((a, b) => b.diff - a.diff || b.score - a.score); localStorage[KEY] = JSON.stringify(l.slice(0, 5)); };
+
+function reset(dir) {
+  ball = { x: W / 2, y: H / 2, vx: 6 * dir, vy: (Math.random() * 6 - 3) };
+}
+function start() {
+  p1 = H / 2 - PH / 2; p2 = p1; s1 = s2 = 0; reset(Math.random() < .5 ? 1 : -1); state = 'play';
+}
+function text(t, px, py, size, align = 'center') {
+  x.font = `bold ${size}px "Courier New",monospace`; x.textAlign = align; x.fillText(t, px, py);
+}
+function update() {
+  if (keys.w) p1 -= 8; if (keys.s) p1 += 8;
+  if (keys.ArrowUp) p2 -= 8; if (keys.ArrowDown) p2 += 8;
+  p1 = Math.max(0, Math.min(H - PH, p1)); p2 = Math.max(0, Math.min(H - PH, p2));
+  ball.x += ball.vx; ball.y += ball.vy;
+  if (ball.y < 0 || ball.y > H - BS) { ball.vy *= -1; ball.y = Math.max(0, Math.min(H - BS, ball.y)); }
+  const hit = (px, py) => ball.x < px + PW && ball.x + BS > px && ball.y < py + PH && ball.y + BS > py;
+  if (ball.vx < 0 && hit(20, p1)) { ball.vx = Math.min(14, -ball.vx * 1.07); ball.vy += ((ball.y + BS / 2) - (p1 + PH / 2)) / 8; ball.x = 20 + PW; }
+  if (ball.vx > 0 && hit(W - 20 - PW, p2)) { ball.vx = -Math.min(14, ball.vx * 1.07); ball.vy += ((ball.y + BS / 2) - (p2 + PH / 2)) / 8; ball.x = W - 20 - PW - BS; }
+  if (ball.x < -BS) { s2++; reset(1); }
+  if (ball.x > W) { s1++; reset(-1); }
+  if (s1 >= WIN || s2 >= WIN) {
+    winner = s1 > s2 ? 'JOGADOR 1' : 'JOGADOR 2'; name = ''; state = 'name';
+  }
+}
+function draw() {
+  x.fillStyle = '#000'; x.fillRect(0, 0, W, H); x.fillStyle = '#fff';
+  if (state === 'splash') {
+    text('PONG', W / 2, 120, 80);
+    text('PONTUACOES MAXIMAS', W / 2, 190, 28);
+    const l = load();
+    if (!l.length) text('--- sem registos ---', W / 2, 260, 22);
+    l.forEach((e, i) => text(`${i + 1}. ${e.name.padEnd(8, '.')} ${e.score}-${e.opp}`, W / 2, 250 + i * 34, 24));
+    text('J1: W / S     J2: SETAS CIMA / BAIXO', W / 2, 480, 18);
+    text('PRIMA ESPACO PARA JOGAR', W / 2, 540, 26);
+    return;
+  }
+  if (state === 'name') {
+    text(winner + ' VENCEU!', W / 2, 200, 44);
+    text('ESCREVA O NOME (ENTER):', W / 2, 300, 24);
+    text(name + '_', W / 2, 360, 36);
+    return;
+  }
+  for (let y = 0; y < H; y += 30) x.fillRect(W / 2 - 3, y, 6, 16);
+  x.fillRect(20, p1, PW, PH); x.fillRect(W - 20 - PW, p2, PW, PH); x.fillRect(ball.x, ball.y, BS, BS);
+  text(s1, W / 2 - 80, 80, 64); text(s2, W / 2 + 80, 80, 64);
+}
+addEventListener('keydown', e => {
+  keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = true;
+  if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault();
+  if (state === 'splash' && e.key === ' ') start();
+  else if (state === 'name') {
+    if (e.key === 'Enter' && name) { save({ name, score: Math.max(s1, s2), opp: Math.min(s1, s2), diff: Math.abs(s1 - s2) }); state = 'splash'; }
+    else if (e.key === 'Backspace') name = name.slice(0, -1);
+    else if (/^[a-zA-Z0-9]$/.test(e.key) && name.length < 8) name += e.key.toUpperCase();
+  }
+});
+addEventListener('keyup', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; });
+(function loop() { if (state === 'play') update(); draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
